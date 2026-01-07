@@ -18,6 +18,21 @@ from .output_validator import (
     DISCLAIMERS,
 )
 
+from .advanced_guards import (
+    AdvancedGuardrailManager,
+    LanguageGuardrail,
+    BiasGuardrail,
+    FraudGuardrail,
+    AbuseGuardrail,
+    ComplianceGuardrail,
+    GuardrailResult,
+    AggregatedGuardrailResult,
+    GuardrailCategory,
+    RiskLevel,
+    ActionType,
+    get_advanced_guardrails,
+)
+
 __all__ = [
     # Input validation
     "InputValidator",
@@ -31,4 +46,17 @@ __all__ = [
     "HallucinationDetector",
     "create_output_validator",
     "DISCLAIMERS",
+    # Advanced guardrails
+    "AdvancedGuardrailManager",
+    "LanguageGuardrail",
+    "BiasGuardrail",
+    "FraudGuardrail",
+    "AbuseGuardrail",
+    "ComplianceGuardrail",
+    "GuardrailResult",
+    "AggregatedGuardrailResult",
+    "GuardrailCategory",
+    "RiskLevel",
+    "ActionType",
+    "get_advanced_guardrails",
 ]
