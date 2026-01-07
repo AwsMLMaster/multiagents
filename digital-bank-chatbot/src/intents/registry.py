@@ -18,6 +18,7 @@ class IntentCategory(str, Enum):
     RAG = "rag"
     SUPPORT = "support"
     ANALYTICS = "analytics"
+    INSIGHTS = "insights"
     OFFERINGS = "offerings"
     GENERAL = "general"
 
@@ -488,6 +489,165 @@ INTENT_REGISTRY: Dict[str, IntentDefinition] = {
             "Create a budget",
             "How much over budget?",
             "Budget planning",
+        ],
+    ),
+
+    # =========================================================================
+    # Insights Intents
+    # =========================================================================
+    "insights.view": IntentDefinition(
+        id="insights.view",
+        category=IntentCategory.INSIGHTS,
+        description="View financial insights and recommendations",
+        target_agent="insights_agent",
+        requires_auth=True,
+        tools=["get_insights", "get_recommendations"],
+        examples_he=[
+            "יש לי תובנות?",
+            "מה קורה עם החשבון שלי?",
+            "יש משהו שאני צריך לדעת?",
+            "תן לי תובנות על הכסף שלי",
+            "מה אתה ממליץ לי?",
+        ],
+        examples_en=[
+            "Any insights for me?",
+            "What's happening with my account?",
+            "Anything I should know?",
+            "Give me insights on my money",
+            "What do you recommend?",
+        ],
+    ),
+
+    "insights.spending": IntentDefinition(
+        id="insights.spending",
+        category=IntentCategory.INSIGHTS,
+        description="Get spending insights and patterns",
+        target_agent="insights_agent",
+        requires_auth=True,
+        tools=["analyze_spending", "detect_patterns"],
+        optional_params=["period", "category"],
+        examples_he=[
+            "איפה הכסף שלי הולך?",
+            "על מה אני מבזבז?",
+            "יש הוצאות חריגות?",
+            "מה ההוצאות הגדולות שלי?",
+            "תנתח לי את ההוצאות",
+        ],
+        examples_en=[
+            "Where is my money going?",
+            "What am I spending on?",
+            "Any unusual expenses?",
+            "What are my biggest expenses?",
+            "Analyze my spending",
+        ],
+    ),
+
+    "insights.transfers": IntentDefinition(
+        id="insights.transfers",
+        category=IntentCategory.INSIGHTS,
+        description="Insights about transfers and new payees",
+        target_agent="insights_agent",
+        requires_auth=True,
+        tools=["analyze_transfers", "detect_new_payees"],
+        examples_he=[
+            "יש העברות חדשות?",
+            "למי העברתי כסף לאחרונה?",
+            "יש מוטבים חדשים?",
+            "תראה לי העברות חריגות",
+        ],
+        examples_en=[
+            "Any new transfers?",
+            "Who did I transfer to recently?",
+            "Any new payees?",
+            "Show me unusual transfers",
+        ],
+    ),
+
+    "insights.subscriptions": IntentDefinition(
+        id="insights.subscriptions",
+        category=IntentCategory.INSIGHTS,
+        description="Insights about subscriptions and recurring payments",
+        target_agent="insights_agent",
+        requires_auth=True,
+        tools=["detect_subscriptions", "analyze_recurring"],
+        examples_he=[
+            "אילו מנויים יש לי?",
+            "על מה אני משלם כל חודש?",
+            "יש מנויים שלא אני משתמש?",
+            "כמה אני משלם על מנויים?",
+            "תשלומים קבועים",
+        ],
+        examples_en=[
+            "What subscriptions do I have?",
+            "What am I paying monthly?",
+            "Any unused subscriptions?",
+            "How much on subscriptions?",
+            "Recurring payments",
+        ],
+    ),
+
+    "insights.savings_opportunity": IntentDefinition(
+        id="insights.savings_opportunity",
+        category=IntentCategory.INSIGHTS,
+        description="Identify savings opportunities",
+        target_agent="insights_agent",
+        requires_auth=True,
+        tools=["find_savings_opportunities", "analyze_idle_balance"],
+        examples_he=[
+            "איפה אפשר לחסוך?",
+            "איך אני יכול לחסוך יותר?",
+            "יש לי כסף שיושב סתם?",
+            "מה אתה ממליץ לעשות עם הכסף?",
+        ],
+        examples_en=[
+            "Where can I save?",
+            "How can I save more?",
+            "Do I have idle money?",
+            "What should I do with my money?",
+        ],
+    ),
+
+    "insights.alerts": IntentDefinition(
+        id="insights.alerts",
+        category=IntentCategory.INSIGHTS,
+        description="View and manage financial alerts",
+        target_agent="insights_agent",
+        requires_auth=True,
+        tools=["get_alerts", "manage_alert_preferences"],
+        examples_he=[
+            "יש התראות?",
+            "מה ההתראות שלי?",
+            "הגדר לי התראה על הוצאות",
+            "תעדכן אותי על שינויים",
+        ],
+        examples_en=[
+            "Any alerts?",
+            "What are my alerts?",
+            "Set spending alert",
+            "Notify me of changes",
+        ],
+    ),
+
+    "insights.act_on_recommendation": IntentDefinition(
+        id="insights.act_on_recommendation",
+        category=IntentCategory.INSIGHTS,
+        description="Act on a recommendation from insights",
+        target_agent="insights_agent",
+        requires_auth=True,
+        requires_mfa=False,
+        tools=["execute_recommendation", "record_action"],
+        required_params=["recommendation_id"],
+        examples_he=[
+            "תבצע את ההמלצה",
+            "אני רוצה לעשות את זה",
+            "כן, תעשה את מה שהמלצת",
+            "אשר את הפעולה",
+        ],
+        examples_en=[
+            "Execute the recommendation",
+            "I want to do this",
+            "Yes, do what you recommended",
+            "Confirm the action",
         ],
     ),
 
