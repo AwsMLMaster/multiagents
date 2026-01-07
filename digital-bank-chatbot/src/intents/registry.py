@@ -18,6 +18,7 @@ class IntentCategory(str, Enum):
     RAG = "rag"
     SUPPORT = "support"
     ANALYTICS = "analytics"
+    OFFERINGS = "offerings"
     GENERAL = "general"
 
 
@@ -487,6 +488,156 @@ INTENT_REGISTRY: Dict[str, IntentDefinition] = {
             "Create a budget",
             "How much over budget?",
             "Budget planning",
+        ],
+    ),
+
+    # =========================================================================
+    # Offerings Intents
+    # =========================================================================
+    "offerings.view": IntentDefinition(
+        id="offerings.view",
+        category=IntentCategory.OFFERINGS,
+        description="View available offerings for customer",
+        target_agent="offerings_agent",
+        requires_auth=True,
+        tools=["get_matched_offerings", "get_offering_details"],
+        examples_he=[
+            "מה ההצעות שיש לי?",
+            "יש הצעות מיוחדות בשבילי?",
+            "מה אתם מציעים לי?",
+            "הצג הטבות",
+            "יש לכם מבצעים?",
+            "אילו מוצרים מתאימים לי?",
+        ],
+        examples_en=[
+            "What offers do you have for me?",
+            "Any special offers?",
+            "Show me promotions",
+            "What products suit me?",
+        ],
+    ),
+
+    "offerings.interest": IntentDefinition(
+        id="offerings.interest",
+        category=IntentCategory.OFFERINGS,
+        description="Customer expresses interest in an offering",
+        target_agent="offerings_agent",
+        requires_auth=True,
+        tools=["record_interest", "get_offering_details"],
+        required_params=["offering_id"],
+        examples_he=[
+            "אני מעוניין בהצעה הזו",
+            "ספר לי עוד על ההצעה",
+            "אשמח לשמוע פרטים",
+            "זה מעניין אותי",
+            "תן לי עוד מידע",
+        ],
+        examples_en=[
+            "I'm interested in this offer",
+            "Tell me more about the offer",
+            "I'd like more details",
+            "This interests me",
+        ],
+    ),
+
+    "offerings.consent": IntentDefinition(
+        id="offerings.consent",
+        category=IntentCategory.OFFERINGS,
+        description="Customer consents to proceed with offering",
+        target_agent="offerings_agent",
+        requires_auth=True,
+        requires_mfa=False,
+        tools=["record_consent", "initiate_fulfillment"],
+        required_params=["offering_id"],
+        optional_params=["amount", "term_months"],
+        examples_he=[
+            "אני רוצה להתקדם עם ההצעה",
+            "אני מאשר",
+            "בואו נעשה את זה",
+            "אני מסכים",
+            "כן, אני רוצה",
+            "תמשיכו עם הבקשה",
+        ],
+        examples_en=[
+            "I want to proceed with the offer",
+            "I approve",
+            "Let's do it",
+            "I agree",
+            "Yes, I want this",
+        ],
+    ),
+
+    "offerings.decline": IntentDefinition(
+        id="offerings.decline",
+        category=IntentCategory.OFFERINGS,
+        description="Customer declines an offering",
+        target_agent="offerings_agent",
+        requires_auth=True,
+        tools=["record_decline"],
+        required_params=["offering_id"],
+        optional_params=["reason"],
+        examples_he=[
+            "לא מתאים לי",
+            "לא תודה",
+            "לא מעוניין",
+            "אולי בפעם אחרת",
+            "תודה אבל לא",
+        ],
+        examples_en=[
+            "Not for me",
+            "No thanks",
+            "Not interested",
+            "Maybe another time",
+            "Thanks but no",
+        ],
+    ),
+
+    "offerings.status": IntentDefinition(
+        id="offerings.status",
+        category=IntentCategory.OFFERINGS,
+        description="Check status of offering request",
+        target_agent="offerings_agent",
+        requires_auth=True,
+        tools=["get_consent_status"],
+        optional_params=["consent_id", "offering_id"],
+        examples_he=[
+            "מה המצב של הבקשה שלי?",
+            "האם יצרו איתי קשר?",
+            "מתי יחזרו אליי?",
+            "סטטוס הבקשה",
+        ],
+        examples_en=[
+            "What's the status of my request?",
+            "Did anyone contact me?",
+            "When will they call back?",
+            "Request status",
+        ],
+    ),
+
+    "offerings.savings": IntentDefinition(
+        id="offerings.savings",
+        category=IntentCategory.OFFERINGS,
+        description="Open savings account from offering",
+        target_agent="offerings_agent",
+        requires_auth=True,
+        requires_mfa=True,
+        tools=["open_savings_account", "transfer_to_savings"],
+        required_params=["amount"],
+        optional_params=["term_months", "account_type"],
+        examples_he=[
+            "רוצה לפתוח חיסכון",
+            "להעביר לחיסכון",
+            "לפתוח פיקדון",
+            "לחסוך את הכסף",
+            "להתחיל לחסוך",
+            "תעביר 10000 לחיסכון",
+        ],
+        examples_en=[
+            "Want to open savings",
+            "Transfer to savings",
+            "Open a deposit",
+            "Save the money",
+            "Start saving",
         ],
     ),
 
