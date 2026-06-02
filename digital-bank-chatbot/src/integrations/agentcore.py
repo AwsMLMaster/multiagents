@@ -9,6 +9,7 @@ AgentCore provides:
 - Tool orchestration
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -143,16 +144,23 @@ class AgentCoreClient:
         self,
         user_id: str,
         metadata: Optional[Dict[str, Any]] = None,
+        timeout: float = 10.0,
     ) -> AgentCoreSession:
         """Create a new AgentCore session."""
-        try:
-            response = self.bedrock_agent_runtime.create_session(
+        def _create():
+            return self.bedrock_agent_runtime.create_session(
                 agentId=self.agent_id,
                 agentAliasId=self.agent_alias_id,
                 sessionAttributes={
                     "user_id": user_id,
                     **(metadata or {}),
                 },
+            )
+
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_create),
+                timeout=timeout,
             )
 
             session = AgentCoreSession(
@@ -167,17 +175,26 @@ class AgentCoreClient:
             logger.info(f"Created AgentCore session {session.session_id} for user {user_id}")
             return session
 
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout creating AgentCore session for user {user_id}")
+            raise
         except Exception as e:
             logger.error(f"Failed to create AgentCore session: {e}")
             raise
 
-    async def get_session(self, session_id: str) -> Optional[AgentCoreSession]:
+    async def get_session(self, session_id: str, timeout: float = 10.0) -> Optional[AgentCoreSession]:
         """Retrieve existing session information."""
-        try:
-            response = self.bedrock_agent_runtime.get_session(
+        def _get():
+            return self.bedrock_agent_runtime.get_session(
                 agentId=self.agent_id,
                 agentAliasId=self.agent_alias_id,
                 sessionId=session_id,
+            )
+
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_get),
+                timeout=timeout,
             )
 
             return AgentCoreSession(
@@ -189,21 +206,34 @@ class AgentCoreClient:
                 metadata=response.get("sessionAttributes", {}),
             )
 
-        except self.bedrock_agent_runtime.exceptions.ResourceNotFoundException:
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout retrieving session {session_id}")
             return None
         except Exception as e:
+            # Treat resource-not-found as a non-error absence
+            if "ResourceNotFoundException" in type(e).__name__:
+                return None
             logger.error(f"Failed to get session {session_id}: {e}")
             raise
 
-    async def end_session(self, session_id: str) -> bool:
+    async def end_session(self, session_id: str, timeout: float = 10.0) -> bool:
         """End an AgentCore session."""
-        try:
-            self.bedrock_agent_runtime.delete_session(
+        def _delete():
+            return self.bedrock_agent_runtime.delete_session(
                 agentId=self.agent_id,
                 agentAliasId=self.agent_alias_id,
                 sessionId=session_id,
             )
+
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(_delete),
+                timeout=timeout,
+            )
             logger.info(f"Ended AgentCore session {session_id}")
+            return True
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout ending session {session_id}; treating as ended")
             return True
         except Exception as e:
             logger.error(f"Failed to end session {session_id}: {e}")
@@ -217,25 +247,32 @@ class AgentCoreClient:
         memory_type: AgentCoreMemoryType,
         content: Dict[str, Any],
         ttl_seconds: Optional[int] = None,
+        timeout: float = 10.0,
     ) -> AgentCoreMemoryEntry:
         """Store a memory entry in AgentCore."""
-        try:
-            memory_input = {
-                "memoryType": memory_type.value,
-                "content": json.dumps(content),
-            }
+        memory_input = {
+            "memoryType": memory_type.value,
+            "content": json.dumps(content),
+        }
+        if ttl_seconds:
+            memory_input["ttlSeconds"] = ttl_seconds
 
-            if ttl_seconds:
-                memory_input["ttlSeconds"] = ttl_seconds
-
-            response = self.bedrock_agent_runtime.put_memory(
+        def _put():
+            return self.bedrock_agent_runtime.put_memory(
                 agentId=self.agent_id,
                 agentAliasId=self.agent_alias_id,
                 sessionId=session_id,
                 memoryInput=memory_input,
             )
 
-            entry = AgentCoreMemoryEntry(
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_put),
+                timeout=timeout,
+            )
+
+            logger.debug(f"Stored {memory_type.value} memory in session {session_id}")
+            return AgentCoreMemoryEntry(
                 memory_id=response.get("memoryId", ""),
                 memory_type=memory_type,
                 content=content,
@@ -243,9 +280,9 @@ class AgentCoreClient:
                 expires_at=datetime.utcnow() if ttl_seconds else None,
             )
 
-            logger.debug(f"Stored {memory_type.value} memory in session {session_id}")
-            return entry
-
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout storing memory in session {session_id}")
+            raise
         except Exception as e:
             logger.error(f"Failed to store memory: {e}")
             raise
@@ -256,23 +293,28 @@ class AgentCoreClient:
         memory_type: Optional[AgentCoreMemoryType] = None,
         query: Optional[str] = None,
         max_results: int = 10,
+        timeout: float = 10.0,
     ) -> List[AgentCoreMemoryEntry]:
         """Retrieve memories from AgentCore."""
+        params: Dict[str, Any] = {
+            "agentId": self.agent_id,
+            "agentAliasId": self.agent_alias_id,
+            "sessionId": session_id,
+            "maxResults": max_results,
+        }
+        if memory_type:
+            params["memoryType"] = memory_type.value
+        if query:
+            params["query"] = query
+
+        def _get():
+            return self.bedrock_agent_runtime.get_memory(**params)
+
         try:
-            params = {
-                "agentId": self.agent_id,
-                "agentAliasId": self.agent_alias_id,
-                "sessionId": session_id,
-                "maxResults": max_results,
-            }
-
-            if memory_type:
-                params["memoryType"] = memory_type.value
-
-            if query:
-                params["query"] = query
-
-            response = self.bedrock_agent_runtime.get_memory(**params)
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_get),
+                timeout=timeout,
+            )
 
             memories = []
             for item in response.get("memories", []):
@@ -286,6 +328,9 @@ class AgentCoreClient:
 
             return memories
 
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout retrieving memories for session {session_id}")
+            return []
         except Exception as e:
             logger.error(f"Failed to retrieve memories: {e}")
             return []
@@ -361,6 +406,7 @@ class AgentCoreClient:
         content: str,
         content_type: str = "INPUT",  # INPUT or OUTPUT
         session_id: Optional[str] = None,
+        timeout: float = 10.0,
     ) -> AgentCoreGuardrailResult:
         """Check content against AgentCore guardrails."""
         if not self.guardrail_id:
@@ -369,17 +415,21 @@ class AgentCoreClient:
                 guardrail_id="none",
             )
 
-        try:
-            response = self.bedrock_agent_runtime.apply_guardrail(
+        def _apply():
+            return self.bedrock_agent_runtime.apply_guardrail(
                 guardrailIdentifier=self.guardrail_id,
                 guardrailVersion="DRAFT",
                 source=content_type,
                 content=[{"text": {"text": content}}],
             )
 
-            action = AgentCoreGuardrailAction(
-                response.get("action", "ALLOW")
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_apply),
+                timeout=timeout,
             )
+
+            action = AgentCoreGuardrailAction(response.get("action", "ALLOW"))
 
             matched_policies = []
             modified_content = None
@@ -403,7 +453,6 @@ class AgentCoreClient:
                     for pii in assessment["sensitiveInformationPolicy"].get("piiEntities", []):
                         matched_policies.append(f"pii:{pii.get('type')}")
 
-            # Get modified content if anonymized
             if action == AgentCoreGuardrailAction.ANONYMIZE:
                 outputs = response.get("outputs", [])
                 if outputs:
@@ -416,9 +465,15 @@ class AgentCoreClient:
                 modified_content=modified_content,
             )
 
+        except asyncio.TimeoutError:
+            logger.error(f"Guardrail check timed out after {timeout}s; failing open")
+            return AgentCoreGuardrailResult(
+                action=AgentCoreGuardrailAction.WARN,
+                guardrail_id=self.guardrail_id,
+                explanation="Guardrail check timed out",
+            )
         except Exception as e:
             logger.error(f"Guardrail check failed: {e}")
-            # Fail open with warning
             return AgentCoreGuardrailResult(
                 action=AgentCoreGuardrailAction.WARN,
                 guardrail_id=self.guardrail_id,
@@ -433,6 +488,7 @@ class AgentCoreClient:
         input_text: str,
         enable_trace: bool = True,
         end_session: bool = False,
+        timeout: float = 90.0,
     ) -> Dict[str, Any]:
         """
         Invoke the agent through AgentCore gateway.
@@ -442,8 +498,11 @@ class AgentCoreClient:
         - Guardrail enforcement
         - Tool orchestration
         - Response streaming
+
+        The entire boto3 call + EventStream drain runs in a thread so it
+        never blocks the event loop, preventing other sessions from freezing.
         """
-        try:
+        def _invoke_and_drain() -> Dict[str, Any]:
             response = self.bedrock_agent_runtime.invoke_agent(
                 agentId=self.agent_id,
                 agentAliasId=self.agent_alias_id,
@@ -453,7 +512,6 @@ class AgentCoreClient:
                 endSession=end_session,
             )
 
-            # Process streaming response
             completion = ""
             trace_events = []
             citations = []
@@ -462,10 +520,8 @@ class AgentCoreClient:
                 if "chunk" in event:
                     chunk_text = event["chunk"].get("bytes", b"").decode("utf-8")
                     completion += chunk_text
-
                 if "trace" in event and enable_trace:
                     trace_events.append(event["trace"])
-
                 if "citation" in event:
                     citations.append(event["citation"])
 
@@ -478,6 +534,16 @@ class AgentCoreClient:
                 "guardrails_applied": bool(self.guardrail_id),
             }
 
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(_invoke_and_drain),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                f"invoke_agent timed out after {timeout}s for session {session_id}"
+            )
+            raise
         except Exception as e:
             logger.error(f"Agent invocation failed: {e}")
             raise
@@ -487,14 +553,17 @@ class AgentCoreClient:
         session_id: str,
         input_text: str,
         tools: List[Dict[str, Any]],
-        tool_handler: callable,
+        tool_handler: Any,
+        timeout: float = 90.0,
     ) -> Dict[str, Any]:
         """
         Invoke agent with custom tool handling.
 
         AgentCore manages the tool orchestration loop.
+        The initial boto3 call + EventStream drain run in a thread.
+        Tool handler callbacks are dispatched back on the event loop.
         """
-        try:
+        def _invoke_and_drain() -> tuple:
             response = self.bedrock_agent_runtime.invoke_agent(
                 agentId=self.agent_id,
                 agentAliasId=self.agent_alias_id,
@@ -504,27 +573,34 @@ class AgentCoreClient:
             )
 
             completion = ""
-            tool_results = []
+            tool_requests = []
 
             for event in response.get("completion", []):
                 if "chunk" in event:
                     completion += event["chunk"].get("bytes", b"").decode("utf-8")
 
-                # Handle tool use requests from AgentCore
                 if "returnControl" in event:
                     invocation = event["returnControl"].get("invocationInputs", [])
                     for tool_input in invocation:
                         if "functionInvocationInput" in tool_input:
                             func_input = tool_input["functionInvocationInput"]
-                            tool_name = func_input.get("function", "")
-                            tool_params = func_input.get("parameters", {})
-
-                            # Execute tool via handler
-                            result = await tool_handler(tool_name, tool_params)
-                            tool_results.append({
-                                "tool": tool_name,
-                                "result": result,
+                            tool_requests.append({
+                                "tool": func_input.get("function", ""),
+                                "params": func_input.get("parameters", {}),
                             })
+
+            return completion, tool_requests
+
+        try:
+            completion, tool_requests = await asyncio.wait_for(
+                asyncio.to_thread(_invoke_and_drain),
+                timeout=timeout,
+            )
+
+            tool_results = []
+            for req in tool_requests:
+                result = await tool_handler(req["tool"], req["params"])
+                tool_results.append({"tool": req["tool"], "result": result})
 
             return {
                 "completion": completion,
@@ -532,6 +608,11 @@ class AgentCoreClient:
                 "tool_results": tool_results,
             }
 
+        except asyncio.TimeoutError:
+            logger.error(
+                f"invoke_agent_with_tools timed out after {timeout}s for session {session_id}"
+            )
+            raise
         except Exception as e:
             logger.error(f"Agent invocation with tools failed: {e}")
             raise
@@ -542,22 +623,42 @@ class AgentCoreMemoryAdapter:
     Adapter to use AgentCore memory with our existing memory interface.
 
     This allows gradual migration from custom memory to AgentCore.
+    Session health monitoring is integrated so that unresponsive sessions
+    are automatically replaced without the caller noticing.
     """
 
-    def __init__(self, agentcore_client: AgentCoreClient):
+    def __init__(
+        self,
+        agentcore_client: AgentCoreClient,
+        health_monitor: Optional[Any] = None,  # SessionHealthMonitor
+    ):
         self.client = agentcore_client
+        self._health_monitor = health_monitor
         self._session_map: Dict[str, str] = {}  # user_id -> session_id
 
     async def get_or_create_session(self, user_id: str) -> str:
-        """Get existing session or create new one."""
-        if user_id in self._session_map:
-            session = await self.client.get_session(self._session_map[user_id])
+        """Get existing session or create a new one, recovering stale sessions."""
+        existing_id = self._session_map.get(user_id)
+        if existing_id:
+            # Check with health monitor first before hitting the API
+            if self._health_monitor:
+                health = self._health_monitor.get_health(existing_id)
+                if health and not health.is_healthy():
+                    new_id = await self._health_monitor.recover(existing_id)
+                    if new_id:
+                        self._session_map[user_id] = new_id
+                        return new_id
+
+            session = await self.client.get_session(existing_id)
             if session:
                 return session.session_id
 
-        # Create new session
         session = await self.client.create_session(user_id)
         self._session_map[user_id] = session.session_id
+
+        if self._health_monitor:
+            self._health_monitor.register(session.session_id, user_id)
+
         return session.session_id
 
     async def get_context_for_intent(
