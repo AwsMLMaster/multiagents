@@ -125,7 +125,14 @@ heat excursion?
 
 ---
 
-## 8. Large Language Models + Formal Verification → Self-Proving Code for Critical Systems
+## 8. ~~Large Language Models + Formal Verification → Self-Proving Code~~ — STRUCK: ALREADY EXISTS
+**Correction (post-review):** this already exists and is actively productized —
+LLM + theorem-prover loops (Dafny/Lean copilots, verified-code toolchains, and
+ongoing research on LLM-generated proofs checked by a prover). It does **not** pass
+the "nobody has made this 1+1 yet" bar. Listing it was an error — left here struck
+through for honesty rather than quietly deleted. Original text below for the record.
+
+## 8 (struck). Large Language Models + Formal Verification → Self-Proving Code for Critical Systems
 **Fuse:** LLM code generation **+** formal methods / theorem provers (which can
 *mathematically prove* a program correct but are too laborious for humans to use
 widely) **+** software engineering.
